@@ -9,12 +9,16 @@ contract Gentlemen {
     struct Wager {
         uint256 amount; // The amount of the wager
         bytes32 description; // A description of the wager
-        mapping(address => bool) votes; // Votes for success
     }
     
     uint256 private expires;
     mapping(address => bool) private approved;
     mapping(address => Wager) public participants;
+    
+    // Votes for success, this cannot be stored on Wager due to
+    // structural limitations
+    // First level is for the particpant, second level is for the votes
+    mapping(address => mapping(address => bool)) private votes;
     
     // creates the contract with a whitelist of particpants and
     // an expiration time in days from creation
@@ -34,23 +38,23 @@ contract Gentlemen {
         require(approved[msg.sender], "Non particpants cannot wager.");
         require(participants[msg.sender].amount == 0, "Participant has already wagered");
         
-        participants[msg.sender] = Wager(msg.value, description, mapping(address => bool));
+        participants[msg.sender] = Wager({amount: msg.value, description: description});
     }
     
     // Allows participants to vote on each others success
     function vote(address votee) public {
-        
         require(
-            participants[votee] != msg.sender,
+            votee != msg.sender,
             "Cannot vote for self."
         );
+        
         require(
-            !participants[votee].votes[msg.sender],
+            votes[votee][msg.sender],
             "Participant has already voted"
         );
         
         // Place the voter into the votes list
-        participants[votee].votes.push(msg.sender);
+        votes[votee][msg.sender] = true;
     }
    
     // function voterHasVoted(address votee, address voter) private view returns (bool) {
