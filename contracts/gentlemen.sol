@@ -12,8 +12,9 @@ contract Gentlemen {
     }
     
     uint256 private expires;
+    address[] private participants;
     mapping(address => bool) private approved;
-    mapping(address => Wager) public participants;
+    mapping(address => Wager) public wagers;
     
     // Votes for success, this cannot be stored on Wager due to
     // structural limitations
@@ -22,9 +23,11 @@ contract Gentlemen {
     
     // creates the contract with a whitelist of particpants and
     // an expiration time in days from creation
-    constructor(address[] memory whitelist, uint duration) payable {
+    constructor(address[] memory whitelist, uint duration) {
         require(whitelist.length > 3, "Must have at least 3 particpants");
         require(duration > 0, "Must end in the future");
+        
+        participants = whitelist;
         
         for (uint p = 0; p < whitelist.length; p++) {
             approved[whitelist[p]] = true;
@@ -36,34 +39,41 @@ contract Gentlemen {
     // Allows a participant to make their wager
     function wager(bytes32 description) public payable {
         require(approved[msg.sender], "Non particpants cannot wager.");
-        require(participants[msg.sender].amount == 0, "Participant has already wagered");
+        require(wagers[msg.sender].amount == 0, "Participant has already wagered");
         
-        participants[msg.sender] = Wager({amount: msg.value, description: description});
+        wagers[msg.sender] = Wager({amount: msg.value, description: description});
     }
     
     // Allows participants to vote on each others success
     function vote(address votee) public {
-        require(
-            votee != msg.sender,
-            "Cannot vote for self."
-        );
-        
-        require(
-            votes[votee][msg.sender],
-            "Participant has already voted"
-        );
+        require(!isExpired(), "Voting has closed");
+        require(votee != msg.sender, "Cannot vote for self.");
+        require(votes[votee][msg.sender], "Participant has already voted");
+        require(approved[msg.sender], "Non participants cannot vote");
         
         // Place the voter into the votes list
         votes[votee][msg.sender] = true;
     }
-   
-    // function voterHasVoted(address votee, address voter) private view returns (bool) {
-    //     for (uint p = 0; p < participants[votee].votes.length; p++) {
-    //         if (participants[votee].votes[p] == voter) {
-    //             return true;
-    //         }
-    //     }
+    
+    function isApproved(address participant) public view returns (bool) {
+        uint count;
         
-    //     return false;
+        for (uint i = 0; i < participants.length; i++) {
+            if (votes[participant][participants[i]]) {
+                count += 1;
+            }
+        }
+        
+        return count >= participants.length - 2;
+    }
+    
+    function isExpired() public view returns (bool) {
+        return block.timestamp >= expires;
+    }
+    
+    // This expires the bet, and pays out any unpaid 
+    // wagers.  It also splits up the failures
+    // funciton expire() {
+        
     // }
 }
